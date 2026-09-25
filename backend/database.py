@@ -102,6 +102,19 @@ CREATE TABLE IF NOT EXISTS questions (
     image_path TEXT,
     FOREIGN KEY (quiz_id) REFERENCES quizzes (id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS game_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL,
+    game TEXT NOT NULL,
+    accuracy REAL NOT NULL,
+    mistakes INTEGER NOT NULL,
+    completion_time REAL NOT NULL,
+    hints INTEGER DEFAULT 0,
+    difficulty TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE CASCADE
+);
 """
 
 
@@ -603,4 +616,44 @@ def get_questions_by_quiz(quiz_id):
     return _fetch_all(
         "SELECT * FROM questions WHERE quiz_id = ? ORDER BY id ASC",
         (quiz_id,),
+    )
+
+
+def create_game_result(
+    patient_id,
+    game,
+    accuracy,
+    mistakes,
+    completion_time,
+    difficulty,
+    hints=0
+):
+    """Save a cognitive game result and return the created record."""
+
+    _require(
+        get_patient_by_id(patient_id),
+        f"Patient with id {patient_id} does not exist"
+    )
+
+    result_id = _insert(
+        """
+        INSERT INTO game_results
+            (patient_id, game, accuracy, mistakes,
+             completion_time, hints, difficulty)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            patient_id,
+            game,
+            accuracy,
+            mistakes,
+            completion_time,
+            hints,
+            difficulty
+        ),
+    )
+
+    return _fetch_one(
+        "SELECT * FROM game_results WHERE id = ?",
+        (result_id,)
     )
