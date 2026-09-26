@@ -384,6 +384,11 @@ export default function App() {
   const [quizStep, setQuizStep] = useState(1)
   const [selectedQuizType, setSelectedQuizType] = useState(null)
 
+
+    // Real patient game results from backend
+  const [gameResults, setGameResults] = useState([])
+  const [gameResultsLoading, setGameResultsLoading] = useState(true)
+  const [gameResultsError, setGameResultsError] = useState('')
   // Local storage for created quizzes
   const [quizzes, setQuizzes] = useState(() => {
     try {
@@ -421,6 +426,32 @@ export default function App() {
   const [previewData, setPreviewData] = useState(null)
   const [saveSuccess, setSaveSuccess] = useState('')
   const [formError, setFormError] = useState('')
+
+    useEffect(() => {
+    const fetchGameResults = async () => {
+      try {
+        setGameResultsLoading(true)
+        setGameResultsError('')
+
+        const response = await fetch(
+          'http://127.0.0.1:5000/api/patients/1/game-results'
+        )
+
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`)
+        }
+
+        const result = await response.json()
+        setGameResults(result.data || [])
+      } catch (error) {
+        setGameResultsError(error.message || 'Unable to load game results')
+      } finally {
+        setGameResultsLoading(false)
+      }
+    }
+
+    fetchGameResults()
+  }, [])
 
   useEffect(() => {
     try {
@@ -941,7 +972,7 @@ export default function App() {
                     </p>
                   </div>
                   <span className="text-xs px-2.5 py-1 rounded-full bg-stone-100 text-stone-600 font-medium">
-                    0 Sessions Recorded
+                    {gameResults.length} Sessions Recorded
                   </span>
                 </div>
 
@@ -958,29 +989,64 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td colSpan={6} className="py-16 px-4 sm:px-6 text-center">
-                          <div className="max-w-md mx-auto space-y-3">
-                            <div className="w-12 h-12 rounded-2xl bg-[#FAF7F0] border border-[#E4DEC9] text-[#825B0E] flex items-center justify-center mx-auto shadow-2xs">
-                              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                              </svg>
-                            </div>
-                            <h4 className="text-base font-bold text-stone-900 tracking-tight">
-                              No quiz activity yet
-                            </h4>
-                            <p className="text-xs text-stone-500 leading-relaxed">
-                              There are no real patient attempts recorded for Demo Patient yet. Once quizzes are completed and synchronized through the backend, session dates, completion rates, and recall response times will be cataloged here.
-                            </p>
-                            <div className="pt-2">
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-stone-100 text-stone-600">
-                                <span className="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
-                                Demo data • Awaiting patient activity
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
+                      {gameResultsLoading ? (
+  <tr>
+    <td colSpan={6} className="py-12 px-4 text-center text-sm text-stone-500">
+      Loading patient activity...
+    </td>
+  </tr>
+) : gameResultsError ? (
+  <tr>
+    <td colSpan={6} className="py-12 px-4 text-center text-sm text-red-600">
+      Unable to load activity: {gameResultsError}
+    </td>
+  </tr>
+) : gameResults.length > 0 ? (
+  gameResults.map((result) => (
+    <tr
+      key={result.id}
+      className="border-b border-[#EFECE2] text-sm text-stone-700"
+    >
+      <td className="py-4 px-4 sm:px-6">
+        {result.created_at
+          ? new Date(result.created_at).toLocaleString()
+          : '—'}
+      </td>
+
+      <td className="py-4 px-4 sm:px-6 font-medium text-stone-900">
+        {result.game}
+      </td>
+
+      <td className="py-4 px-4 sm:px-6">
+        {result.difficulty}
+      </td>
+
+      <td className="py-4 px-4 sm:px-6">
+        {result.accuracy}%
+      </td>
+
+      <td className="py-4 px-4 sm:px-6">
+        {Math.max(0, 4 - result.mistakes)} / 4
+      </td>
+
+      <td className="py-4 px-4 sm:px-6">
+        {result.completion_time}s
+      </td>
+    </tr>
+  ))
+) : (
+  <tr>
+    <td colSpan={6} className="py-12 px-4 text-center">
+      <p className="text-sm font-semibold text-stone-800">
+        No quiz activity yet
+      </p>
+      <p className="text-xs text-stone-500 mt-1">
+        Patient quiz results will appear here after a quiz is completed.
+      </p>
+    </td>
+  </tr>
+)}
+                      
                     </tbody>
                   </table>
                 </div>
