@@ -22,6 +22,8 @@ from database import (
     update_personal_memory,
     delete_personal_memory,
     generate_personalized_questions,
+    create_game_result,
+    get_game_results_by_patient,
     SUPPORTED_LANGUAGES,
 
 )
@@ -310,21 +312,49 @@ def receive_game_results():
             "status": "error",
             "message": "Field 'difficulty' must be one of: easy, medium, hard"
         }), 400
+    result = create_game_result(
+        patient_id=patient_id,
+        game=game.strip(),
+        accuracy=accuracy,
+        mistakes=mistakes,
+        completion_time=completion_time,
+        difficulty=difficulty,
+        hints=hints
+    )
+    return jsonify({
+            "status": "success",
+            "message": "Game result received successfully",
+            "data": {
+                "patient_id": patient_id,
+                "game": game,
+                "accuracy": accuracy,
+                "mistakes": mistakes,
+                "completion_time": completion_time,
+                "hints": hints,
+                "difficulty": difficulty
+            }
+        }), 200
+
+
+@app.route('/api/patients/<int:patient_id>/game-results', methods=['GET'], strict_slashes=False)
+def get_patient_game_results(patient_id):
+    """Return all cognitive game results for a patient."""
+
+    patient = get_patient_by_id(patient_id)
+
+    if not patient:
+        return jsonify({
+            "status": "error",
+            "message": "Patient not found"
+        }), 404
+
+    results = get_game_results_by_patient(patient_id)
 
     return jsonify({
         "status": "success",
-        "message": "Game result received successfully",
-        "data": {
-            "patient_id": patient_id,
-            "game": game,
-            "accuracy": accuracy,
-            "mistakes": mistakes,
-            "completion_time": completion_time,
-            "hints": hints,
-            "difficulty": difficulty
-        }
+        "message": "Game results retrieved successfully",
+        "data": results
     }), 200
-
 @app.route('/api/patients/<int:patient_id>/memories', methods=['POST'], strict_slashes=False)
 def add_personal_memory(patient_id):
     """Add a new personal memory for a patient."""
@@ -546,5 +576,7 @@ if __name__ == '__main__':
 
 
     
+
+
 
 

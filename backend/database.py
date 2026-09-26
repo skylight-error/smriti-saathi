@@ -657,3 +657,21 @@ def create_game_result(
         "SELECT * FROM game_results WHERE id = ?",
         (result_id,)
     )
+
+def get_game_results_by_patient(patient_id):
+    """Return all cognitive game results for a patient."""
+
+    _require(
+        get_patient_by_id(patient_id),
+        f"Patient with id {patient_id} does not exist"
+    )
+
+    return _fetch_all(
+        """
+        SELECT *
+        FROM game_results
+        WHERE patient_id = ?
+        ORDER BY created_at DESC, id DESC
+        """,
+        (patient_id,)
+    )
