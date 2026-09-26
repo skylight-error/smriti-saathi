@@ -30,6 +30,8 @@ Conventions
 import os
 import sqlite3
 
+from werkzeug.security import generate_password_hash, check_password_hash
+
 # Project-root-relative default, so the path works from any working directory.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DB_PATH = os.path.join(BASE_DIR, "database", "smriti.db")
@@ -208,20 +210,49 @@ def _clean(value):
 # ---------------------------------------------------------------------------
 # Database setup
 # ---------------------------------------------------------------------------
-
 def init_db():
-    """Create the database directory and all tables if they do not exist.
-
-    Never drops anything: an existing database/smriti.db with test records
-    is left untouched.
-    """
+    """Create tables and safely add authentication columns to older databases."""
     conn = get_db_connection()
+
     try:
+        # Create the normal database tables.
         conn.executescript(SCHEMA)
+
+        # ----- Caregiver authentication migration -----
+        caregiver_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(caregivers)").fetchall()
+        }
+
+        if "password_hash" not in caregiver_columns:
+            conn.execute(
+                "ALTER TABLE caregivers ADD COLUMN password_hash TEXT"
+            )
+
+        # ----- Patient authentication migration -----
+        patient_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(patients)").fetchall()
+        }
+
+        if "login_code" not in patient_columns:
+            conn.execute(
+                "ALTER TABLE patients ADD COLUMN login_code TEXT"
+            )
+
+        if "pin_hash" not in patient_columns:
+            conn.execute(
+                "ALTER TABLE patients ADD COLUMN pin_hash TEXT"
+            )
+
         conn.commit()
+
     finally:
         conn.close()
+
     return get_db_path()
+
+    
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +286,66 @@ def get_caregiver_by_id(caregiver_id):
         """,
         (caregiver_id,),
     )
+def get_caregiver_by_contact(contact):
+    """Find a caregiver using their contact/login identifier."""
+    contact = str(contact or "").strip()
 
+    if not contact:
+        return None
+
+    return _fetch_one(
+        """
+        SELECT id, name, relationship, contact, password_hash, created_at
+        FROM caregivers
+        WHERE contact = ?
+        """,
+        (contact,),
+    )
+
+
+def set_caregiver_password(caregiver_id, password):
+    """Securely hash and save a caregiver password."""
+    password = str(password or "")
+
+    _require(
+        get_caregiver_by_id(caregiver_id),
+        "Caregiver with id {} does not exist".format(caregiver_id),
+    )
+
+    _require(
+        len(password) >= 6,
+        "Password must contain at least 6 characters.",
+    )
+
+    password_hash = generate_password_hash(password)
+
+    _execute(
+        "UPDATE caregivers SET password_hash = ? WHERE id = ?",
+        (password_hash, caregiver_id),
+    )
+
+    return True
+
+
+def authenticate_caregiver(contact, password):
+    """Verify caregiver login credentials."""
+    caregiver = get_caregiver_by_contact(contact)
+
+    if not caregiver:
+        return None
+
+    password_hash = caregiver.get("password_hash")
+
+    if not password_hash:
+        return None
+
+    if not check_password_hash(password_hash, str(password or "")):
+        return None
+
+    # Never return the password hash to the frontend.
+    caregiver.pop("password_hash", None)
+
+    return caregiver
 
 # ---------------------------------------------------------------------------
 # 2. Patient (always linked to a caregiver)

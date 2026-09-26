@@ -13,9 +13,11 @@ if PROJECT_ROOT not in sys.path:
 from database import (
     init_db,
     create_caregiver,
+    set_caregiver_password,
     get_caregiver_by_id,
     create_patient,
     get_patient_by_id,
+    authenticate_caregiver,
     get_patients_by_caregiver,
     create_personal_memory,
     get_personal_memories,
@@ -49,7 +51,48 @@ def health_check():
         "message": "SmritiSaathi backend is running"
     }), 200
 
+@app.route('/api/caregiver/login', methods=['POST'], strict_slashes=False)
+def caregiver_login():
+    """Authenticate a caregiver using contact and password."""
+    
+    if not request.is_json:
+        return jsonify({
+            "status": "error",
+            "message": "Request body must be valid JSON"
+        }), 400
 
+    data = request.get_json(silent=True)
+
+    if not data or not isinstance(data, dict):
+        return jsonify({
+            "status": "error",
+            "message": "Request body must be a valid JSON object"
+        }), 400
+
+    contact = str(data.get("contact") or "").strip()
+    password = str(data.get("password") or "")
+
+    if not contact or not password:
+        return jsonify({
+            "status": "error",
+            "message": "Contact and password are required"
+        }), 400
+
+    caregiver = authenticate_caregiver(contact, password)
+
+    if not caregiver:
+        return jsonify({
+            "status": "error",
+            "message": "Invalid contact or password"
+        }), 401
+
+    return jsonify({
+        "status": "success",
+        "message": "Login successful",
+        "caregiver": caregiver
+    }), 200 
+
+    
 @app.route('/api/caregivers', methods=['POST'], strict_slashes=False)
 def add_caregiver():
     """API 1 — Create Caregiver"""
@@ -69,8 +112,16 @@ def add_caregiver():
     name = data.get("name")
     relationship = data.get("relationship")
     contact = data.get("contact")
+    password = data.get("password")
 
     # Validate required fields
+    if not password or not isinstance(password, str) or len(password) < 6:
+        return jsonify({
+            "status": "error",
+            "message": "Password must contain at least 6 characters"
+        }), 400
+
+    
     if not name or not isinstance(name, str) or not name.strip():
         return jsonify({
             "status": "error",
@@ -89,17 +140,21 @@ def add_caregiver():
             "message": "Field 'contact' is required and cannot be empty"
         }), 400
 
+    
+        
+       
     caregiver = create_caregiver(
         name=name.strip(),
         relationship=relationship.strip(),
         contact=str(contact).strip()
     )
 
+    set_caregiver_password(caregiver["id"], password)
+
     return jsonify({
         "status": "success",
         "data": caregiver
     }), 201
-
 
 @app.route('/api/patients', methods=['POST'], strict_slashes=False)
 def add_patient():

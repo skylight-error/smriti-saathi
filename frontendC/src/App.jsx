@@ -378,6 +378,13 @@ const INITIAL_DEMO_FAMILY_MEMBERS = [
 ]
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [caregiver, setCaregiver] = useState(null);
+
+    const [loginContact, setLoginContact] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('Quiz Activity')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isCreatingQuiz, setIsCreatingQuiz] = useState(false)
@@ -792,6 +799,109 @@ export default function App() {
       ),
     },
   ]
+    if (!isLoggedIn) {
+  const handleCaregiverLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    setLoginLoading(true);
+
+    try {
+      const response = await fetch('http://127.0.0.1:5001/api/caregiver/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contact: loginContact,
+          password: loginPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setLoginError(data.message || 'Login failed');
+        return;
+      }
+
+      setCaregiver(data.caregiver);
+      setIsLoggedIn(true);
+    } catch (error) {
+      setLoginError('Unable to connect to the server.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#FBF9F4] flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-[#D4AF37]"></span>
+            <h1 className="text-3xl font-bold text-[#0F3E3B]">
+              SmritiSathi
+            </h1>
+          </div>
+
+          <h2 className="text-xl font-semibold text-slate-800 mt-6">
+            Caregiver Login
+          </h2>
+
+          <p className="text-sm text-slate-500 mt-2">
+            Sign in to manage your patient's care.
+          </p>
+        </div>
+
+        <form onSubmit={handleCaregiverLogin} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Contact
+            </label>
+
+            <input
+              type="text"
+              value={loginContact}
+              onChange={(e) => setLoginContact(e.target.value)}
+              placeholder="Enter email or contact"
+              required
+              className="w-full border border-slate-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#0F3E3B]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Password
+            </label>
+
+            <input
+              type="password"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              placeholder="Enter password"
+              required
+              className="w-full border border-slate-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#0F3E3B]"
+            />
+          </div>
+
+          {loginError && (
+            <p className="text-sm text-red-600">
+              {loginError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loginLoading}
+            className="w-full bg-[#0F3E3B] text-white py-3 rounded-lg font-semibold hover:bg-[#0B302E] transition disabled:opacity-60"
+          >
+            {loginLoading ? 'Signing in...' : 'Login'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
   return (
     <div className="min-h-screen bg-[#FBF9F4] text-slate-800 flex flex-col md:flex-row font-sans antialiased">
