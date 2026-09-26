@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-cream: #FAF7F2;
+    --card-cream: #FFFFFF;
+    --card-warm: #F7F3EB;
+    --primary-teal: #0D5C56;
+    --teal-dark: #083E3A;
+    --teal-light: #E6F3F1;
+    --accent-terracotta: #9B4B28;
+    --text-main: #1C2421;
+    --text-muted: #4B5563;
+    --border-soft: #E5DEC9;
+    --sos-red: #D92D20;
+  }
+
+  body {
+    background-color: var(--bg-cream);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 19px;
+    line-height: 1.6;
+    letter-spacing: 0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Dementia accessibility: generous focus outlines for keyboard/switch control */
+  button:focus-visible, a:focus-visible, input:focus-visible {
+    outline: 3px solid #0D5C56;
+    outline-offset: 3px;
+  }
+}
+
+/* Custom gentle pulse animation for voice assistant */
+@keyframes gentle-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+    box-shadow: 0 0 0 0 rgba(13, 92, 86, 0.4);
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+    box-shadow: 0 0 0 18px rgba(13, 92, 86, 0);
+  }
+}
+
+.animate-gentle-pulse {
+  animation: gentle-pulse 2.4s infinite ease-in-out;
+}
+
+/* Dementia-friendly minimum touch target */
+.min-touch-target {
+  min-height: 56px;
+  min-width: 56px;
+}
