@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+// other imports below...
 import { TRANSLATIONS } from '../data/i18n';
+
 import { FAMILY_MEMBERS, FAMILY_QUIZ_QUESTIONS } from '../data/familyMembers';
 import { playGentleChime, playGentleTap, playGentleTryAgain } from '../utils/sound';
 import { speakText, stopSpeaking } from '../utils/speech';
@@ -16,10 +18,34 @@ export default function FamilyQuizScreen({
   const [selectedOptionId, setSelectedOptionId] = useState(null);
   const [status, setStatus] = useState(null); // 'correct', 'retry', 'assisted'
   const [smilesCount, setSmilesCount] = useState(0);
+  const [mistakesCount, setMistakesCount] = useState(0);
+  const [hintsCount, setHintsCount] = useState(0);
+  const [gameStartTime] = useState(Date.now()); 
+  const [backendQuestions, setBackendQuestions] = useState([]);
+
+  useEffect(() => {
+  fetch('http://127.0.0.1:5000/api/patients/1/personalized-questions')
+    .then((response) => response.json())
+    .then((data) => {
+      console.log('Backend questions:', data);
+      setBackendQuestions(data.data || []);
+    })
+    .catch((error) => {
+      console.error('Backend connection error:', error);
+    });
+}, []);
 
   const currentQ = FAMILY_QUIZ_QUESTIONS[currentIndex] || FAMILY_QUIZ_QUESTIONS[0];
   const targetMember = FAMILY_MEMBERS.find(m => m.id === currentQ.targetMemberId) || FAMILY_MEMBERS[0];
 
+  const backendAnswer = backendQuestions[0]?.correct_answer;
+
+const backendOptions = backendAnswer
+  ? FAMILY_MEMBERS.slice(0, 3).map((member) => ({
+      ...member,
+      isCorrect: member.name === backendAnswer
+    }))
+  : [];
   const handleSelectOption = (option) => {
     playGentleTap();
     setSelectedOptionId(option.id);
@@ -34,22 +60,80 @@ export default function FamilyQuizScreen({
       speakText(`${t.correctChoice}. This is ${option.name}, your loving ${option.relation}.`, language);
     } else {
       playGentleTryAgain();
+      setMistakesCount(prev => prev + 1);
       setStatus('retry');
       speakText(t.tryAgainGentle, language);
     }
   };
 
   const handleNext = () => {
-    playGentleTap();
-    stopSpeaking();
-    setStatus(null);
-    setSelectedOptionId(null);
-    setCurrentIndex((prev) => (prev + 1) % FAMILY_QUIZ_QUESTIONS.length);
+  playGentleTap();
+  stopSpeaking();
+  
+
+  const isLastQuestion =
+    currentIndex === FAMILY_QUIZ_QUESTIONS.length - 1;
+
+  if (isLastQuestion) {
+    sendGameResult();
+  }
+
+  setStatus(null);
+  setSelectedOptionId(null);
+  setCurrentIndex((prev) => (prev + 1) % FAMILY_QUIZ_QUESTIONS.length);
+};
+
+  const sendGameResult = async () => {
+  const completionTime = Math.max(
+    1,
+    Math.round((Date.now() - gameStartTime) / 1000)
+  );
+
+
+  const totalQuestions = FAMILY_QUIZ_QUESTIONS.length;
+
+const accuracy =
+  totalQuestions > 0
+    ? Math.round((smilesCount / totalQuestions) * 100)
+    : 0;
+
+  const resultData = {
+    patient_id: 1,
+    game: 'family_quiz',
+    accuracy: accuracy,
+    mistakes: mistakesCount,
+    completion_time: completionTime,
+    hints: hintsCount,
+    difficulty: 'easy'
   };
+  
+  try {
+    const response = await fetch(
+      'http://127.0.0.1:5000/api/game-results',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(resultData)
+      }
+    );
+
+    const data = await response.json();
+    if (!response.ok) {
+  throw new Error(data.message || 'Failed to save game result');
+}
+    console.log('Game result saved:', data);
+  } catch (error) {
+    console.error('Game result save error:', error);
+  }
+};
 
   const handleIDontKnow = () => {
     playGentleTap();
     setStatus('assisted');
+    setHintsCount(prev => prev + 1);
+
     const relationDesc = targetMember.relationLocal[language] || targetMember.relation;
     speakText(`${t.iDontKnowComfort}. ${targetMember.name}, ${relationDesc}.`, language);
   };
@@ -93,6 +177,12 @@ export default function FamilyQuizScreen({
           <h2 className="text-2xl sm:text-3xl font-extrabold text-[#1C2421]">
             {t.whoIsThis}
           </h2>
+          {backendQuestions.length > 0 && (
+  <p className="text-xl font-bold text-[#0D5C56] mt-3">
+    {backendQuestions[0].question}
+  </p>
+)}
+
           <p className="text-base sm:text-lg text-[#4B5563] mt-1">
             Question {currentIndex + 1} of {FAMILY_QUIZ_QUESTIONS.length}
           </p>
@@ -126,7 +216,7 @@ export default function FamilyQuizScreen({
 
         {/* 3 Large Dementia-Friendly Option Cards */}
         <div className="space-y-3.5 my-6">
-          {currentQ.options.map((option) => {
+          {(backendOptions.length > 0 ? backendOptions : currentQ.options).map((option) => {
             const isSelected = selectedOptionId === option.id;
             const isCorrectAnswer = option.isCorrect;
             const showSuccess = isSelected && isCorrectAnswer;
@@ -157,9 +247,7 @@ export default function FamilyQuizScreen({
                   <div className="text-xl sm:text-2xl font-bold text-[#1C2421] truncate">
                     {option.name}
                   </div>
-                  <div className="text-sm sm:text-base text-[#4B5563] font-medium mt-0.5">
-                    {option.relation}
-                  </div>
+                  
                 </div>
 
                 {showSuccess && (
